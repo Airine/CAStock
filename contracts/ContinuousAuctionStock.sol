@@ -27,7 +27,7 @@ contract ContinuousAuctionStock {
 
     mapping (address => uint) public unused;
 
-    mapping (address => uint) public 
+    mapping (address => uint) public payed;
 
     // buy requests
     BuyRequest[] public buyReqs;
@@ -47,8 +47,8 @@ contract ContinuousAuctionStock {
         address memory buyer = msg.sender;
         uint amount = msg.value / price;
         uint unused = msg.value - price * amount;
-        console.log(buyer, " is requesting to buy ", amount, " stocks with price ", price);
-        console.log("Payed: ", msg.value, ", unused: ", unused);
+        // console.log(buyer, " is requesting to buy ", amount, " stocks with price ", price);
+        // console.log("Payed: ", msg.value, ", unused: ", unused);
         // require(buyer!=issuer, "the buyer can not be the issuer");
     }
 
