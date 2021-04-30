@@ -28,9 +28,6 @@ contract ContinuousAuctionStock {
     
     // the number of stocks issued
     uint public count;
-    
-    // fake buyable stocks
-    uint public buyable;
 
     // record the stock balance of each user
     mapping (address => uint) public stocks;
@@ -74,14 +71,6 @@ contract ContinuousAuctionStock {
             payable(buyer).transfer(unuse * 1 ether);    
         }
         
-        // if (buyable > amount) {
-        //     stocks[buyer] += amount;
-        //     buyable -= amount;
-        // } else {
-        //     emit log("no enough stock to buy");
-        // }
-        
-        // TODO: send the buy request
         uint requestID = buyReqs.length - 1;
         buyReqs.push(BuyRequest(price, amount, amount, 1, buyer));
         
@@ -104,6 +93,7 @@ contract ContinuousAuctionStock {
                             return;
                         } else {
                             amount -= request.stock;
+                            buyReqs[requestID].amount -= request.stock;
                             request.status = 3;
                             seller.transfer(price * request.stock * 1 ether);
                             request.stock = 0;
@@ -141,7 +131,7 @@ contract ContinuousAuctionStock {
             emit log("no enough stock to sell");
             return;
         }
-        // payable(seller).transfer(price * amount * 1 ether);
+        
         if (seller != issuer) {
             stocks[seller] -= amount;
         }
@@ -166,6 +156,7 @@ contract ContinuousAuctionStock {
                             return;
                         } else {
                             amount -= request.stock;
+                            sellReqs[requestID].amount -= request.stock;
                             request.status = 3;
                             payable(seller).transfer(price * request.stock * 1 ether);
                             request.stock = 0;
