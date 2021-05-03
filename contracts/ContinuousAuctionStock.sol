@@ -5,6 +5,7 @@ import "./ConvertLib.sol";
 import "./Queue.sol";
 import "./DoublySortedLinkedList.sol";
 
+
 struct BuyRequest {
     uint256 price;
     uint256 stock;
@@ -40,9 +41,9 @@ contract ContinuousAuctionStock {
     // sell requests
     SellRequest[] public sellReqs;
 
-    DoublySortedLinkedList public buyPrices;
+    DoublySortedLinkedList public buyPrices = new DoublySortedLinkedList();
 
-    DoublySortedLinkedList public sellPrices;
+    DoublySortedLinkedList public sellPrices = new DoublySortedLinkedList();
     
     event log(string message);
     
@@ -71,8 +72,8 @@ contract ContinuousAuctionStock {
             payable(buyer).transfer(unuse * 1 ether);    
         }
         
-        uint requestID = buyReqs.length - 1;
         buyReqs.push(BuyRequest(price, amount, amount, 1, buyer));
+        uint requestID = buyReqs.length - 1;
         
         // 1. if can be satisified, process directly
         if (price > sellPrices.min()) {
@@ -84,18 +85,21 @@ contract ContinuousAuctionStock {
                     SellRequest storage request = sellReqs[sellReqID];
                     if (request.status == 1) {
                         address payable seller = payable(request.seller);
+                        uint sellPrice = request.price;
                         if (request.stock > amount) {
                             request.stock -= amount;
                             buyReqs[requestID].status = 3;
                             buyReqs[requestID].amount = 0;
                             stocks[buyer] += amount;
-                            seller.transfer(price * amount * 1 ether);
+                            seller.transfer(sellPrice * amount * 1 ether);
+                            payable(buyer).transfer((price-sellPrice) * amount * 1 ether);
                             return;
                         } else {
                             amount -= request.stock;
                             buyReqs[requestID].amount -= request.stock;
                             request.status = 3;
-                            seller.transfer(price * request.stock * 1 ether);
+                            seller.transfer(sellPrice * request.stock * 1 ether);
+                            payable(buyer).transfer((price-sellPrice) * request.stock * 1 ether);
                             request.stock = 0;
                             q.dequeue();
                         }
@@ -123,6 +127,7 @@ contract ContinuousAuctionStock {
     }
 
     function sell(uint amount, uint price) public {
+        emit log("sell");
         if (msg.sender == issuer) {
             count += amount;
         }
@@ -135,11 +140,15 @@ contract ContinuousAuctionStock {
         if (seller != issuer) {
             stocks[seller] -= amount;
         }
-        uint requestID = sellReqs.length - 1;
-        sellReqs.push(SellRequest(price, amount, amount, 1, seller));
         
+        sellReqs.push(SellRequest(price, amount, amount, 1, seller));
+        emit logInt(sellReqs.length);
+        uint requestID = sellReqs.length - 1;
+        emit logInt(requestID);
+
         // 1. if can be satisified, process directly
         if (price < buyPrices.max()) {
+            emit log("request can be satisified");
             uint id = buyPrices.findge(price);
             while (id != 0) {
                 Queue q = buyPrices.getQ(id);
@@ -171,6 +180,7 @@ contract ContinuousAuctionStock {
         }
                         
         // 2. else add the left amount to the queue
+        emit log("new request");
         uint idx = sellPrices.find(price);
         if (idx == 0) {
             // not found
