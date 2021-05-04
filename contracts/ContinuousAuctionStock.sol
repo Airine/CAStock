@@ -44,6 +44,8 @@ contract ContinuousAuctionStock {
     DoublySortedLinkedList public buyPrices = new DoublySortedLinkedList();
 
     DoublySortedLinkedList public sellPrices = new DoublySortedLinkedList();
+
+    uint public pricingFactor = 1 gwei;
     
     event log(string message);
     
@@ -55,21 +57,31 @@ contract ContinuousAuctionStock {
         issuer = msg.sender;
     }
 
+    function setPricingFactor(uint factor) public returns (bool) {
+        if (msg.sender == issuer && count == 0) {
+            pricingFactor = factor;
+            return true;
+        } else {
+            emit log("Cannot set the pricing factor on the flight. / You don't have the permission.");
+            return false;
+        }
+    }
+
     function buy(uint price) public payable {
         address buyer = msg.sender;
-        uint amount = msg.value / 1 ether / price;
-        uint unuse = msg.value / 1 ether - price * amount;
+        uint amount = msg.value / pricingFactor / price;
+        uint unuse = msg.value / pricingFactor - price * amount;
         emit buyRequest(buyer, price, amount, msg.value);
         
-        if (address(this).balance < unuse * 1 ether) {
+        if (address(this).balance < unuse * pricingFactor) {
             emit log("not enough balance to return the unused");
-            emit logInt(address(this).balance / 1 ether);
+            emit logInt(address(this).balance / pricingFactor);
             // this branch should not be reached normally
             // if reached, revert all the transactions
             revert();
         } else if (unuse > 0) {
             emit log("send back the unused");
-            payable(buyer).transfer(unuse * 1 ether);    
+            payable(buyer).transfer(unuse * pricingFactor);    
         }
         
         buyReqs.push(BuyRequest(price, amount, amount, 1, buyer));
@@ -91,15 +103,15 @@ contract ContinuousAuctionStock {
                             buyReqs[requestID].status = 3;
                             buyReqs[requestID].amount = 0;
                             stocks[buyer] += amount;
-                            seller.transfer(sellPrice * amount * 1 ether);
-                            payable(buyer).transfer((price-sellPrice) * amount * 1 ether);
+                            seller.transfer(sellPrice * amount * pricingFactor);
+                            payable(buyer).transfer((price-sellPrice) * amount * pricingFactor);
                             return;
                         } else {
                             amount -= request.stock;
                             buyReqs[requestID].amount -= request.stock;
                             request.status = 3;
-                            seller.transfer(sellPrice * request.stock * 1 ether);
-                            payable(buyer).transfer((price-sellPrice) * request.stock * 1 ether);
+                            seller.transfer(sellPrice * request.stock * pricingFactor);
+                            payable(buyer).transfer((price-sellPrice) * request.stock * pricingFactor);
                             request.stock = 0;
                             q.dequeue();
                         }
@@ -161,13 +173,13 @@ contract ContinuousAuctionStock {
                             request.stock -= amount;
                             sellReqs[requestID].status = 3;
                             sellReqs[requestID].amount = 0;
-                            payable(seller).transfer(price * amount * 1 ether);
+                            payable(seller).transfer(price * amount * pricingFactor);
                             return;
                         } else {
                             amount -= request.stock;
                             sellReqs[requestID].amount -= request.stock;
                             request.status = 3;
-                            payable(seller).transfer(price * request.stock * 1 ether);
+                            payable(seller).transfer(price * request.stock * pricingFactor);
                             request.stock = 0;
                             q.dequeue();
                         }
@@ -194,4 +206,97 @@ contract ContinuousAuctionStock {
         }
     }
 
+    function balance(address addr) public view returns (uint) {
+        return addr.balance;
+    }
+
+
+    function withdrawBuyRequst(uint requestID) public returns (uint8) {
+        require(requestID < buyReqs.length);
+        
+        BuyRequest storage request = buyReqs[requestID];
+        address buyer = request.buyer;
+        
+        require(buyer == msg.sender);
+        
+        if (request.status == 1) {
+            request.status = 2;
+            // TODO: return the money back
+        }
+        return request.status;
+    }
+
+
+    function withdrawSellRequst(uint requestID) public returns (uint8) {
+        require(requestID < sellReqs.length);
+        
+        SellRequest storage request = sellReqs[requestID];
+        address seller = request.seller;
+        
+        require(seller == msg.sender);
+        
+        if (request.status == 1) {
+            request.status = 2;
+            stocks[seller] += request.stock;
+        }
+        return request.status;
+    }
+
+    function getNumBuyRequest() public view returns (uint) {
+        return buyReqs.length;
+    }
+
+    function getNumSellRequest() public view returns (uint) {
+        return sellReqs.length;
+    }
+
+    function getBuyRequestPrice(uint id) public view returns (uint) {
+        require(id < buyReqs.length);
+        return buyReqs[id].price;
+    }
+
+    function getSellRequestPrice(uint id) public view returns (uint) {
+        require(id < sellReqs.length);
+        return sellReqs[id].price;
+    }
+
+    function getBuyRequestStock(uint id) public view returns (uint) {
+        require(id < buyReqs.length);
+        return buyReqs[id].stock;
+    }
+
+    function getSellRequestStock(uint id) public view returns (uint) {
+        require(id < sellReqs.length);
+        return sellReqs[id].stock;
+    }
+
+    function getBuyRequestAmount(uint id) public view returns (uint) {
+        require(id < buyReqs.length);
+        return buyReqs[id].amount;
+    }
+
+    function getSellRequestAmount(uint id) public view returns (uint) {
+        require(id < sellReqs.length);
+        return sellReqs[id].amount;
+    }
+
+    function getBuyRequestStatus(uint id) public view returns (uint) {
+        require(id < buyReqs.length);
+        return buyReqs[id].status;
+    }
+
+    function getSellRequestStatus(uint id) public view returns (uint) {
+        require(id < sellReqs.length);
+        return sellReqs[id].status;
+    }
+
+    function getBuyRequestBuyer(uint id) public view returns (address) {
+        require(id < buyReqs.length);
+        return buyReqs[id].buyer;
+    }
+
+    function getSellRequestSeller(uint id) public view returns (address) {
+        require(id < sellReqs.length);
+        return sellReqs[id].seller;
+    }
 }
