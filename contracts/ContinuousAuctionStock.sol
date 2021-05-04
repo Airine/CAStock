@@ -108,7 +108,8 @@ contract ContinuousAuctionStock {
                             return;
                         } else {
                             amount -= request.stock;
-                            buyReqs[requestID].amount -= request.stock;
+                            buyReqs[requestID].stock -= request.stock;
+                            stocks[buyer] += request.stock;
                             request.status = 3;
                             seller.transfer(sellPrice * request.stock * pricingFactor);
                             payable(buyer).transfer((price-sellPrice) * request.stock * pricingFactor);
@@ -171,13 +172,15 @@ contract ContinuousAuctionStock {
                         // address payable seller = payable(request.seller);
                         if (request.stock > amount) {
                             request.stock -= amount;
+                            stocks[request.buyer] += amount;
                             sellReqs[requestID].status = 3;
-                            sellReqs[requestID].amount = 0;
+                            sellReqs[requestID].stock = 0;
                             payable(seller).transfer(price * amount * pricingFactor);
                             return;
                         } else {
                             amount -= request.stock;
-                            sellReqs[requestID].amount -= request.stock;
+                            sellReqs[requestID].stock -= request.stock;
+                            stocks[request.buyer] += request.stock;
                             request.status = 3;
                             payable(seller).transfer(price * request.stock * pricingFactor);
                             request.stock = 0;
